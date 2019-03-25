@@ -11,7 +11,6 @@
 #include <usbhub.h>
 #include <Sabertooth.h>
 
-
 // ---------------------------------------------------------------------------------------
 //                       Debug - Verbose Flags
 // ---------------------------------------------------------------------------------------
@@ -58,7 +57,7 @@ boolean extraClicks = false;
 //    Dome Movement Setup
 // ---------------------------------------------------------------------------------------
 byte domeSpeed = 127;
-int domeRotationSpeed;
+int domeRotationSpeed = 0;
 #define SYREN_ADDR 129
 Sabertooth * SyR = new Sabertooth(SYREN_ADDR, Serial1);
 
@@ -68,6 +67,15 @@ Sabertooth * SyR = new Sabertooth(SYREN_ADDR, Serial1);
 byte drivespeed1 = 127; //For Speed Setting (Normal): set this to whatever speeds works for you. 0-stop, 127-full speed.
 byte turnspeed = 75; // Recommend beginner: 40 to 50, experienced: 50+, I like 75
 byte driveDeadBandRange = 10; // Used to set the Sabertooth DeadZone for foot motors
+int currentTurnVal = 0;
+int currentDriveVal = 0;
+int requestedTurnVal = 0;
+int requestedDriveVal = 0;
+int incrementTurn = 3;
+int incrementDrive = 3;
+long previousMillisMotor = millis();
+
+
 #define SABERTOOTH_ADDR 128 // Serial Address for Foot Sabertooth (Dip Switches!)
 Sabertooth *ST=new Sabertooth(SABERTOOTH_ADDR, Serial1); // SAME Serial Port as the Dome Motor
 
@@ -83,7 +91,7 @@ void setup()
   
     //Debug Serial for use with USB Debugging
     Serial.begin(115200);
-    //while (!Serial);
+    while (!Serial);
     
     if (Usb.Init() == -1)
     {
@@ -99,15 +107,15 @@ void setup()
     PS3Controller->attachOnInit(onInitPS3Controller); // onInitPS3Controller is called upon a new connection
 
     // Setup dome motor
-    //Serial1.begin(9600);
-    //SyR->autobaud();
-    //SyR->setTimeout(20); // 100ms increments
-    //SyR->stop();
+    Serial1.begin(9600);
+    SyR->autobaud();
+    SyR->setTimeout(20); // 100ms increments
+    SyR->stop();
 
     // Setup legs motor
-    //ST->autobaud(); // Send the autobaud command to the Sabertooth controller(s). 
-    //ST->setTimeout(10); //DMB: How low can we go for safety reasons? multiples of 100ms 
-    //ST->setDeadband(driveDeadBandRange); 
+    ST->autobaud(); // Send the autobaud command to the Sabertooth controller(s). 
+    ST->setTimeout(10); //DMB: How low can we go for safety reasons? multiples of 100ms 
+    ST->setDeadband(driveDeadBandRange); 
 }
 
 // =======================================================================================
@@ -115,14 +123,14 @@ void setup()
 // =======================================================================================
 void loop()
 {   
-    if ( !readUSB() )
-    {
-      //We have a fault condition that we want to ensure that we do NOT process any controller data!!!
-      printOutput(output);
-      return;
-    }
+   if ( !readUSB() )
+   {
+     //We have a fault condition that we want to ensure that we do NOT process any controller data!!!
+     printOutput(output);
+     return;
+   }
     
-    checkController();
+   checkController();
   
    if (extraClicks)
    {
@@ -131,13 +139,26 @@ void loop()
           extraClicks = false;
       }
    }
-  
-   printOutput(output);
-//   domeRotationSpeed = 127;
-//   SyR->motor(domeRotationSpeed);
-//   ST->turn(0);
-//   ST->drive(127);
-   //delay(20);
+
+   if (previousMillisMotor + 10 < millis())
+   {
+    if (currentTurnVal < requestedTurnVal)
+      currentTurnVal = (currentTurnVal + incrementTurn < requestedTurnVal) ? currentTurnVal + incrementTurn : requestedTurnVal;
+    if (currentTurnVal > requestedTurnVal)
+      currentTurnVal = (currentTurnVal - incrementTurn > requestedTurnVal) ? currentTurnVal - incrementTurn : requestedTurnVal;
+    
+    if (currentDriveVal < requestedDriveVal)
+      currentDriveVal = (currentDriveVal + incrementDrive < requestedDriveVal) ? currentDriveVal + incrementDrive : requestedDriveVal;
+    if (currentDriveVal > requestedDriveVal)
+      currentDriveVal = (currentDriveVal - incrementDrive > requestedDriveVal) ? currentDriveVal - incrementDrive : requestedDriveVal;
+
+    previousMillisMotor = millis();
+   }
+   
+   
+   ST->turn(currentTurnVal);
+   ST->drive(currentDriveVal);
+   SyR->motor(domeRotationSpeed);
 }
 
 // =======================================================================================
@@ -145,206 +166,31 @@ void loop()
 // =======================================================================================
 void checkController()
 {
-       if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(UP) && !extraClicks)
-     {              
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: UP Selected.\r\n");
-            #endif
-            
-            previousMillis = millis();
-            extraClicks = true;
-            
-     }
-  
-     if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(DOWN) && !extraClicks)
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: DOWN Selected.\r\n");
-            #endif                     
-            
-            previousMillis = millis();
-            extraClicks = true;
-       
-     }
-
-     if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(LEFT) && !extraClicks)
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: LEFT Selected.\r\n");
-            #endif  
-            
-            previousMillis = millis();
-            extraClicks = true;
-
-     }
-     
-     if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(RIGHT) && !extraClicks)
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: RIGHT Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-                     
-     }
-     
-     if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(CIRCLE) && !extraClicks)
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: CIRCLE Selected.\r\n");
-            #endif      
-            
-            previousMillis = millis();
-            extraClicks = true;
-           
-     }
-
-     if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(CROSS) && !extraClicks)
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: CROSS Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-              
-     }
-     
-     if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(TRIANGLE) && !extraClicks)
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: TRIANGLE Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-              
-     }
-     
-
-     if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(SQUARE) && !extraClicks)
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: SQUARE Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-              
-     }
-     
-     if (PS3Controller->PS3Connected && !extraClicks && PS3Controller->getButtonPress(L1))
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: LEFT 1 Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-     }
-
-     if (PS3Controller->PS3Connected && !extraClicks && PS3Controller->getButtonPress(L2))
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: LEFT 2 Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-     }
-
-     if (PS3Controller->PS3Connected && !extraClicks && PS3Controller->getButtonPress(R1))
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: RIGHT 1 Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-     }
-
-     if (PS3Controller->PS3Connected && !extraClicks && PS3Controller->getButtonPress(R2))
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: RIGHT 2 Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-     }
-
-     if (PS3Controller->PS3Connected && !extraClicks && PS3Controller->getButtonPress(SELECT))
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: SELECT Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-     }
-
-     if (PS3Controller->PS3Connected && !extraClicks && PS3Controller->getButtonPress(START))
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: START Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-     }
-
-     if (PS3Controller->PS3Connected && !extraClicks && PS3Controller->getButtonPress(PS))
-     {
-            #ifdef SHADOW_DEBUG
-                strcat(output, "Button: PS Selected.\r\n");
-            #endif       
-            
-            previousMillis = millis();
-            extraClicks = true;
-     }
-
+     requestedTurnVal = 0;
+     requestedDriveVal = 0;
+     domeRotationSpeed = 0;
      if (PS3Controller->PS3Connected && ((abs(PS3Controller->getAnalogHat(LeftHatY)-128) > joystickDeadZoneRange) || (abs(PS3Controller->getAnalogHat(LeftHatX)-128) > joystickDeadZoneRange)))
-     {
-            
-            int currentValueY = PS3Controller->getAnalogHat(LeftHatY) - 128;
-            int currentValueX = PS3Controller->getAnalogHat(LeftHatX) - 128;
-            
-            char yString[5];
-            itoa(currentValueY, yString, 10);
+     {            
+            int currentValueY = PS3Controller->getAnalogHat(LeftHatY);
+            int currentValueX = PS3Controller->getAnalogHat(LeftHatX);
 
-            char xString[5];
-            itoa(currentValueX, xString, 10);
+            requestedTurnVal  = map(currentValueX, 0, 255, -turnspeed, turnspeed);
+            requestedDriveVal = map(currentValueY, 0, 255, -drivespeed1, drivespeed1);
 
-            #ifdef SHADOW_DEBUG
-                strcat(output, "LEFT Joystick Y Value: ");
-                strcat(output, yString);
-                strcat(output, "\r\n");
-                strcat(output, "LEFT Joystick X Value: ");
-                strcat(output, xString);
-                strcat(output, "\r\n");
-            #endif       
+            Serial.print("Current Turn Val: ");
+            Serial.println(currentTurnVal);
+            Serial.print("Current Drive Val: ");
+            Serial.println(currentDriveVal);
+
      }
 
      if (PS3Controller->PS3Connected && ((abs(PS3Controller->getAnalogHat(RightHatY)-128) > joystickDeadZoneRange) || (abs(PS3Controller->getAnalogHat(RightHatX)-128) > joystickDeadZoneRange)))
      {
-            int currentValueY = PS3Controller->getAnalogHat(RightHatY) - 128;
-            int currentValueX = PS3Controller->getAnalogHat(RightHatX) - 128;
-
-            char yString[5];
-            itoa(currentValueY, yString, 10);
-
-            char xString[5];
-            itoa(currentValueX, xString, 10);
-
-            #ifdef SHADOW_DEBUG
-                strcat(output, "RIGHT Joystick Y Value: ");
-                strcat(output, yString);
-                strcat(output, "\r\n");
-                strcat(output, "RIGHT Joystick X Value: ");
-                strcat(output, xString);
-                strcat(output, "\r\n");
-            #endif       
+            //float currentValueY = PS3Controller->getAnalogHat(RightHatY) - 128;
+            float currentValueX = PS3Controller->getAnalogHat(RightHatX) - 128;
+            
+            domeRotationSpeed = (currentValueX/128)*domeSpeed;
+            
      }
 }
 
