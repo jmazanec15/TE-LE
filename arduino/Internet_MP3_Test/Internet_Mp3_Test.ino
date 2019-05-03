@@ -80,7 +80,7 @@ void setup() {
     Serial.print("Attempting to connect to SSID: ");
     Serial.println(ssid);
     // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
-    status = WiFi.begin(ssid, pass);
+    status = WiFi.begin(ssid);
 
     // wait 10 seconds for connection:
     delay(10000);
@@ -111,7 +111,7 @@ void setup() {
   if (client.connect(server, 443)) {
     Serial.println("connected to server");
     // Make a HTTP request:
-    client.println("GET /v0/b/teleui.appspot.com/o/test.mp3?alt=media&token=f8cd3491-69cb-4dda-8a67-81137406a6cb HTTP/1.1");
+    client.println("GET /v0/b/teleui.appspot.com/o/0.mp3?alt=media&token=9d628f35-bb4a-410e-9e83-60aa38b3f443 HTTP/1.1");
     client.println("Host: firebasestorage.googleapis.com");
     client.println("Connection: close");
     client.println();
