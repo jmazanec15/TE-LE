@@ -1,2 +1,2 @@
-#define SECRET_SSID "GOSQUIRES"
-#define SECRET_PASS "Gopsubeatirish2012"
+#define SECRET_SSID "ND-guest"
+#define SECRET_PASS ""
