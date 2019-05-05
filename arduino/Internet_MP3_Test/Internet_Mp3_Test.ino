@@ -12,7 +12,6 @@
 
  Circuit:
  * WiFi shield attached
-
  created 13 July 2010
  by dlf (Metodo2 srl)
  modified 31 May 2012
