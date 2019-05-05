@@ -118,11 +118,12 @@ bool noInputDome = true;
 
 // These are common pins between breakout and shield
 #define CARDCS 9     // Card chip select pin
+#define WIFICARD 4  // WIFI Board Chip Select
 // DREQ should be an Int pin, see http://arduino.cc/en/Reference/attachInterrupt
 #define DREQ 3       // VS1053 Data request, ideally an Interrupt pin
 
-Adafruit_VS1053_FilePlayer musicPlayer = Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, CARDCS);
-
+Adafruit_VS1053_FilePlayer definedSoundsPlayer = Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, CARDCS);
+Adafruit_VS1053_FilePlayer msgPlayer = Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, WIFICARD);
 
 
 // ---------------------------------------------------------------------------------------
@@ -183,17 +184,16 @@ void setup()
 
     Serial.print(F("\r\nBluetooth Library Started"));
 
-    // Setup for PS3 Controller
-    PS3Controller->attachOnInit(onInitPS3Controller); // onInitPS3Controller is called upon a new connection
-
     // Setup for MP3 Player
-    if (! musicPlayer.begin()) { // initialise the music player
+    if (! definedSoundsPlayer.begin()) { // initialise the music player
         Serial.println(F("Couldn't find VS1053, do you have the right pins defined?"));
         while (1);
     }
     Serial.println(F("VS1053 found"));
-    musicPlayer.setVolume(20,20);
-    musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
+    definedSoundsPlayer.setVolume(20,20);
+    definedSoundsPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
+    msgPlayer.setVolume(20,20);
+    msgPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
 
     // Setup legs motor
     Serial1.begin(9600);
@@ -218,14 +218,18 @@ void setup()
     clear_all();
 
     /* Init SD Card */
-    if (!SD.begin(CARDCS)) {
+    
+    if (!SD.begin(WIFICARD)) {
       Serial.println("SD initialization failed!");
       while(1);
     }
     Serial.println("SD initialization done.");
-
+    
+    
     //Setup Fingerprint Sensor
+    
     finger.begin(57600);
+    delay(2000);
     if(finger.verifyPassword()) {
       Serial.println("Found fingerprint sensor!");
     } else {
@@ -256,7 +260,11 @@ void setup()
     lights_green_on();
     lightsMillis = millis();
 
-    musicPlayer.startPlayingFile("welcome.wav");
+    // Setup for PS3 Controller
+    PS3Controller->attachOnInit(onInitPS3Controller); // onInitPS3Controller is called upon a new connection
+
+
+    definedSoundsPlayer.startPlayingFile("welcome.wav");
 
 }
 
@@ -264,8 +272,7 @@ void setup()
 //           Main Program Loop - This is the recurring check loop for entire sketch
 // =======================================================================================
 void loop()
-{
-   Serial.println("Loop");
+{ 
    if (!readUSB()) {
      printOutput(output); return; // Fault condition; dont process controller data
    }
@@ -280,7 +287,7 @@ void loop()
           extraClicks = false;
       }
    }
-   if ((lightsMillis + 2000) < millis()) {
+   if ((lightsMillis + 5000) < millis()) {
     clear_all();
    }
 }
@@ -309,14 +316,18 @@ void respondToInput() {
           clear_all();
           lights_yellow_on();
           moveArm();
+          Serial.println("Getting Fingerprint");
           int p = getFingerprintIDez();
           if (p == -1) {
+            Serial.println("Finger Print Rejected");
             clear_all();
             lights_red_on();
             lightsMillis = millis();
-            musicPlayer.startPlayingFile("denied.mp3");
+            definedSoundsPlayer.startPlayingFile("denied.wav");
           }
           else {
+            Serial.print("Finger Accecpted with ");
+            Serial.println(p);
             clear_all();
             lights_green_on();
             lightsMillis = millis();
@@ -354,6 +365,7 @@ void playMessage(int fingerId) {
   char uri[100];
   strcpy(uri, databaseURI);
   strcat(uri, buf);
+  Serial.println(uri);
   if (client.connect(databaseServer, 443)){
     client.print("GET ");
     client.print(uri);
@@ -363,21 +375,56 @@ void playMessage(int fingerId) {
     client.println();
   }
   else {
+    Serial.println("Getting Database info failed");
     clear_all();
     lights_red_on();
     lightsMillis = millis();
     return;
   }
-  if (deserializeJson(doc, client)) {
+  if (SD.exists("t.txt")) {
+    SD.remove("t.txt");
+  }
+  bool endOfHeaders = false;
+  File myFile = SD.open("t.txt", FILE_WRITE);
+  while(client.connected()) {
+    if(myFile) {
+      while(client.available()){
+        byte c = client.read();
+        if (c == '\r' && !endOfHeaders) {
+          c = client.read();
+          if (c == '\n') {
+            c = client.read();
+            if (c == '\r') {
+              c = client.read();
+              if (c == '\n') {
+                endOfHeaders = true;
+                continue;
+              }
+            }
+          }
+        }
+        if (endOfHeaders) {
+          myFile.write(c);
+        }
+      }
+    }
+  }
+  myFile.close();
+  myFile = SD.open("t.txt");
+  DeserializationError err = deserializeJson(doc,  myFile);
+  if (err) {
+    Serial.print("Deserializing JSON Failed: ");
+    Serial.println(err.c_str());
     clear_all();
     lights_red_on();
     lightsMillis = millis();
     return;
   }
   client.stop();
+  myFile.close();
   const char * msg = doc["fields"]["msgURL"]["stringValue"];
   if (msg == nullptr) {
-    musicPlayer.startPlayingFile("nomsg.wav");
+    definedSoundsPlayer.startPlayingFile("nomsg.wav");
     return;
   }
   if (client.connect(storageServer, 443)) {
@@ -397,8 +444,8 @@ void playMessage(int fingerId) {
   if (SD.exists("msg.mp3")) {
     SD.remove("msg.mp3");
   }
-  File myFile = SD.open("msg.mp3", FILE_WRITE);
-  musicPlayer.startPlayingFile("dialup.wav");
+  definedSoundsPlayer.startPlayingFile("dialup.wav");
+  myFile = SD.open("msg.mp3", FILE_WRITE);
   while(client.connected()) {
     if(myFile) {
       while(client.available()) {
@@ -414,8 +461,8 @@ void playMessage(int fingerId) {
 
   if (myFile) {
     myFile.close();
-    musicPlayer.stopPlaying();
-    musicPlayer.startPlayingFile("msg.mp3");
+    definedSoundsPlayer.stopPlaying();
+    msgPlayer.startPlayingFile("msg.mp3");
   }
 
   client.stop(); 
