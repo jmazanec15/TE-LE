@@ -140,13 +140,9 @@ int wait_val = 3000;
 int light_vals[NUM_LIGHTS];
 long lightsMillis = millis();
 
-
-
-
 int yellow_lights[] = {0, 3, 6, 9, 12, 15, 18, 21};
 int green_lights[] = {1, 4, 7, 10, 13, 16, 19, 22};
 int red_lights[] = {2, 5, 8, 11, 14, 17, 20, 23};
-
 
 void clear_all();
 void turn_everything_on();
@@ -158,6 +154,12 @@ void lights_red_on();
 
 int getFingerprintIDez();
 void playMessage();
+
+// ---------------------------------------------------------------------------------------
+//    Ad selling setup
+// ---------------------------------------------------------------------------------------
+int currentAd = 0;
+int NUM_ADS = 1;
 
 // =======================================================================================
 //                                 Main Program
@@ -214,16 +216,16 @@ void setup()
     clear_all();
 
     /* Init SD Card */
-    
+
     if (!SD.begin(CARDCS)) {
       Serial.println("SD initialization failed!");
       while(1);
     }
     Serial.println("SD initialization done.");
-    
-    
+
+
     //Setup Fingerprint Sensor
-    
+
     finger.begin(57600);
     delay(2000);
     if(finger.verifyPassword()) {
@@ -232,7 +234,7 @@ void setup()
       Serial.println("Did not find fingerprint sensor:(");
       while(1);
     }
-    
+
 
     if (WiFi.status() == WL_NO_SHIELD) {
         Serial.println("WiFi shield not present");
@@ -268,7 +270,7 @@ void setup()
 //           Main Program Loop - This is the recurring check loop for entire sketch
 // =======================================================================================
 void loop()
-{ 
+{
    if (!readUSB()) {
      printOutput(output); return; // Fault condition; dont process controller data
    }
@@ -338,14 +340,14 @@ void respondToInput() {
      if(PS3Controller->PS3Connected && PS3Controller->getButtonPress(CIRCLE) && !extraClicks) {
      }
 
-     /* Triangle: Next message */
+     /* Triangle: Sell ads */
      if(PS3Controller->PS3Connected && PS3Controller->getButtonPress(TRIANGLE) && !extraClicks) {
-      
+        sellAds();
      }
-     
+
      /* Square: Delete message message */
      if(PS3Controller->PS3Connected && PS3Controller->getButtonPress(SQUARE) && !extraClicks) {
-      
+
      }
 
      /* Need to do something or other with lights */
@@ -463,7 +465,7 @@ void playMessage(int fingerId) {
     musicPlayer.startPlayingFile("msg.mp3");
   }
 
-  client.stop(); 
+  client.stop();
 }
 
 /* Get Fingerprint Match */
@@ -479,9 +481,9 @@ int getFingerprintIDez() {
 
   p = finger.fingerFastSearch();
   if (p != FINGERPRINT_OK)  return -1;
-  
+
   // found a match!
-  return finger.fingerID; 
+  return finger.fingerID;
 }
 
 /* Arm Control */
@@ -502,16 +504,16 @@ void moveArm() {
       armpos = (targetpos > armpos) ? armpos + 1 :  armpos - 1;
       arm.write(armpos);
       armdelay = millis();
-    } 
+    }
   }
 }
 
 /* Leg Motor Control */
 void adjustLegMotors(float joystickValueX, float joystickValueY) {
-  
+
   static long motorTimer = millis();
   static float turnVal = 0, driveVal = 0;
-  
+
   int requestedTurnVal  = map(joystickValueX, 0, 255, -1*LEG_MAX_TURN, LEG_MAX_TURN);
   int requestedDriveVal = -1*map(joystickValueY, 0, 255, -1*LEG_MAX_DRIVE, LEG_MAX_DRIVE);
 
@@ -564,7 +566,7 @@ void clear_all() {
 void lights_green_on() {
   clear_all();
   for (int i = 0; i < NUM_LIGHTS/3; i++) {
-    light_vals[green_lights[i]] = ledMaxBright;  
+    light_vals[green_lights[i]] = ledMaxBright;
   }
   write_lights();
 }
@@ -572,7 +574,7 @@ void lights_green_on() {
 void lights_red_on() {
   clear_all();
   for (int i = 0; i < NUM_LIGHTS/3; i++) {
-    light_vals[red_lights[i]] = ledMaxBright;  
+    light_vals[red_lights[i]] = ledMaxBright;
   }
   write_lights();
 }
@@ -580,7 +582,7 @@ void lights_red_on() {
 void lights_yellow_on() {
   clear_all();
   for (int i = 0; i < NUM_LIGHTS/3; i++) {
-    light_vals[yellow_lights[i]] = ledMaxBright;  
+    light_vals[yellow_lights[i]] = ledMaxBright;
   }
   write_lights();
 }
@@ -591,12 +593,52 @@ void turn_everything_on() {
     }
     write_lights();
 }
- 
+
 void write_lights() {
   for (int i = 0; i < NUM_LIGHTS; i++) {
     domeTLC.setPWM(i, light_vals[i]);
   }
   domeTLC.write();
+}
+
+
+void sellAds() {
+  /* Play next ad */
+  char num_string[3];
+
+  if (currentAd > NUM_ADS)
+    currentAd = 0;
+  itoa(currentAd++, num_string);
+
+  char ad[12];
+  strcat(ad, "ad");
+  strcat(ad, num_string);
+  strcat(ad, ".mp3");
+  musicPlayer.playFullFile(ad);
+  musicPlayer.playFullFile("purchase.mp3");
+
+  /* Offer user the chance to buy the ad */
+  while (1) {
+    if (!readUSB()) {
+      printOutput(output); return; // Fault condition; dont process controller data
+    }
+    if(PS3Controller->PS3Connected && PS3Controller->getButtonPress(X)) {
+      moveArm();
+retry_purchase:
+      if (getFingerprintIDez() != -1) {
+        musicPlayer.startPlayingFile("accepted.mp3");
+        moveArm();
+      } else {
+        musicPlayer.startPlayingFile("rejected.mp3");
+        goto: retry_purchase;
+      }
+      break;
+    } else if(PS3Controller->PS3Connected && PS3Controller->getButtonPress(TRIANGLE)) {
+      break;
+    }
+  }
+  extraClicks = true;
+  previousMillis = millis();
 }
 
 
