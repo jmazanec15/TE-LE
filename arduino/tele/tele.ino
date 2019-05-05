@@ -158,6 +158,8 @@ void lights_red_on();
 
 int getFingerprintIDez();
 void playMessage();
+int getUserId();
+uint8_t getFingerprintEnroll(int);
 
 // =======================================================================================
 //                                 Main Program
@@ -260,7 +262,7 @@ void setup()
     PS3Controller->attachOnInit(onInitPS3Controller); // onInitPS3Controller is called upon a new connection
 
 
-    musicPlayer.startPlayingFile("welcome.mp3");
+    //musicPlayer.startPlayingFile("welcome.mp3");
 
 }
 
@@ -336,6 +338,17 @@ void respondToInput() {
 
      /* O: Register new user */
      if(PS3Controller->PS3Connected && PS3Controller->getButtonPress(CIRCLE) && !extraClicks) {
+          clear_all();
+          lights_yellow_on();
+          moveArm();
+          lightsMillis = millis();
+          Serial.println("Enrolling New User");
+          int id = getUserId();
+          Serial.println(id);
+          getFingerprintEnroll(id);
+          moveArm();
+          extraClicks = true;
+          previousMillis = millis();
      }
 
      /* Triangle: Next message */
@@ -345,12 +358,282 @@ void respondToInput() {
      
      /* Square: Delete message message */
      if(PS3Controller->PS3Connected && PS3Controller->getButtonPress(SQUARE) && !extraClicks) {
-      
+        finger.emptyDatabase();
+        musicPlayer.startPlayingFile("cleared.mp3");
      }
 
      /* Need to do something or other with lights */
 
      /* Maybe to a dial up routine - kind of like a modem */
+}
+
+int getUserId() {
+  int user = 1;
+  char buf[10];
+  musicPlayer.startPlayingFile("1.mp3");
+  while (true) {
+     if (!readUSB()) {
+        printOutput(output); return; // Fault condition; dont process controller data
+     }
+     if (extraClicks) {
+        if ((previousMillis + 500) < millis()) {
+            extraClicks = false;
+        }
+     }
+     if(PS3Controller->PS3Connected && PS3Controller->getButtonPress(UP) && !extraClicks) {
+        user += 1;
+        if (user > 20) {
+          user = 1;
+        }
+        for (int i = 0; i < 10; i++) {
+          buf[i] = '\0';
+        }
+        itoa(user, buf, 10);
+        strcat(buf, ".mp3");
+        Serial.println(buf);
+        musicPlayer.playFullFile(buf);
+        previousMillis = millis();
+        extraClicks = true; 
+     }
+     if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(DOWN) && !extraClicks) {
+        user -= 1;
+        if (user < 1) {
+          user = 20;
+        }
+        for (int i = 0; i < 10; i++) {
+          buf[i] = '\0';
+        }
+        itoa(user, buf, 10);
+        strcat(buf, ".mp3");
+        Serial.println(buf);
+        musicPlayer.playFullFile(buf);
+        previousMillis = millis();
+        extraClicks = true; 
+     }
+     if (PS3Controller->PS3Connected && PS3Controller->getButtonPress(X) && !extraClicks) {
+        previousMillis = millis();
+        extraClicks = true;
+        break;
+     }
+  }
+  return user;
+}
+
+uint8_t getFingerprintEnroll(int id) {
+  int p = -1;
+  clear_all();
+  lights_yellow_on();
+  lightsMillis = millis();
+  Serial.print("Waiting for valid finger to enroll as #"); Serial.println(id);
+  while (p != FINGERPRINT_OK) {
+    p = finger.getImage();
+    switch (p) {
+    case FINGERPRINT_OK:
+      Serial.println("Image taken");
+      break;
+    case FINGERPRINT_NOFINGER:
+      //Serial.println(".");
+      break;
+    case FINGERPRINT_PACKETRECIEVEERR:
+      Serial.println("Communication error");
+      break;
+    case FINGERPRINT_IMAGEFAIL:
+      Serial.println("Imaging error");
+      break;
+    default:
+      Serial.println("Unknown error");
+      break;
+    }
+  }
+
+  // OK success!
+  clear_all();
+  lights_green_on();
+
+  p = finger.image2Tz(1);
+  switch (p) {
+    case FINGERPRINT_OK:
+      Serial.println("Image converted");
+      break;
+    case FINGERPRINT_IMAGEMESS:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Image too messy");
+      return p;
+    case FINGERPRINT_PACKETRECIEVEERR:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Communication error");
+      return p;
+    case FINGERPRINT_FEATUREFAIL:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Could not find fingerprint features");
+      return p;
+    case FINGERPRINT_INVALIDIMAGE:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Could not find fingerprint features");
+      return p;
+    default:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Unknown error");
+      return p;
+  }
+
+  musicPlayer.playFullFile("accepted.mp3");
+  Serial.println("Remove finger");
+  delay(2000);
+  p = 0;
+  clear_all();
+  lights_yellow_on();
+  while (p != FINGERPRINT_NOFINGER) {
+    p = finger.getImage();
+  }
+  Serial.print("ID "); Serial.println(id);
+  p = -1;
+  Serial.println("Place same finger again");
+  while (p != FINGERPRINT_OK) {
+    p = finger.getImage();
+    switch (p) {
+    case FINGERPRINT_OK:
+      Serial.println("Image taken");
+      break;
+    case FINGERPRINT_NOFINGER:
+      //Serial.print(".");
+      break;
+    case FINGERPRINT_PACKETRECIEVEERR:
+      Serial.println("Communication error");
+      break;
+    case FINGERPRINT_IMAGEFAIL:
+      Serial.println("Imaging error");
+      break;
+    default:
+      Serial.println("Unknown error");
+      break;
+    }
+  }
+
+  clear_all();
+  lights_green_on();
+  // OK success!
+
+  p = finger.image2Tz(2);
+  switch (p) {
+    case FINGERPRINT_OK:
+      Serial.println("Image converted");
+      break;
+    case FINGERPRINT_IMAGEMESS:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Image too messy");
+      return p;
+    case FINGERPRINT_PACKETRECIEVEERR:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Communication error");
+      return p;
+    case FINGERPRINT_FEATUREFAIL:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Could not find fingerprint features");
+      return p;
+    case FINGERPRINT_INVALIDIMAGE:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Could not find fingerprint features");
+      return p;
+    default:
+      clear_all();
+      lights_red_on();
+      lightsMillis = millis();
+      musicPlayer.playFullFile("rejected.mp3")
+      Serial.println("Unknown error");
+      return p;
+  }
+  
+  // OK converted!
+  Serial.print("Creating model for #");  Serial.println(id);
+  
+  p = finger.createModel();
+  if (p == FINGERPRINT_OK) {
+    Serial.println("Prints matched!");
+  } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+    clear_all();
+    lights_red_on();
+    lightsMillis = millis();
+    musicPlayer.playFullFile("rejected.mp3")
+    Serial.println("Communication error");
+    return p;
+  } else if (p == FINGERPRINT_ENROLLMISMATCH) {
+    clear_all();
+    lights_red_on();
+    lightsMillis = millis();
+    musicPlayer.playFullFile("rejected.mp3")
+    Serial.println("Fingerprints did not match");
+    return p;
+  } else {
+    clear_all();
+    lights_red_on();
+    lightsMillis = millis();
+    musicPlayer.playFullFile("rejected.mp3")
+    Serial.println("Unknown error");
+    return p;
+  }   
+  
+  Serial.print("ID "); Serial.println(id);
+  p = finger.storeModel(id);
+  if (p == FINGERPRINT_OK) {
+    musicPlayer.playFullFile("accepted.mp3");
+    Serial.println("Stored!");
+  } else if (p == FINGERPRINT_PACKETRECIEVEERR) {
+    clear_all();
+    lights_red_on();
+    lightsMillis = millis();
+    musicPlayer.playFullFile("rejected.mp3")
+    Serial.println("Communication error");
+    return p;
+  } else if (p == FINGERPRINT_BADLOCATION) {
+    clear_all();
+    lights_red_on();
+    lightsMillis = millis();
+    musicPlayer.playFullFile("rejected.mp3")
+    Serial.println("Could not store in that location");
+    return p;
+  } else if (p == FINGERPRINT_FLASHERR) {
+    clear_all();
+    lights_red_on();
+    lightsMillis = millis();
+    musicPlayer.playFullFile("rejected.mp3")
+    Serial.println("Error writing to flash");
+    return p;
+  } else {
+    clear_all();
+    lights_red_on();
+    lightsMillis = millis();
+    musicPlayer.playFullFile("rejected.mp3")
+    Serial.println("Unknown error");
+    return p;
+  }   
 }
 
 void playMessage(int fingerId) {
