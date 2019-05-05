@@ -360,12 +360,9 @@ void respondToInput() {
 
      /* Square: Delete message message */
      if(PS3Controller->PS3Connected && PS3Controller->getButtonPress(SQUARE) && !extraClicks) {
-<<<<<<< HEAD
-
-=======
-        finger.emptyDatabase();
-        musicPlayer.startPlayingFile("cleared.mp3");
->>>>>>> origin/enroll
+        musicPlayer.playFullFile("cleared.mp3");
+        extraClicks = true;
+        previousMillis = millis();
      }
 
      /* Need to do something or other with lights */
@@ -465,35 +462,35 @@ uint8_t getFingerprintEnroll(int id) {
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Image too messy");
       return p;
     case FINGERPRINT_PACKETRECIEVEERR:
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Communication error");
       return p;
     case FINGERPRINT_FEATUREFAIL:
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Could not find fingerprint features");
       return p;
     case FINGERPRINT_INVALIDIMAGE:
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Could not find fingerprint features");
       return p;
     default:
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Unknown error");
       return p;
   }
@@ -544,35 +541,35 @@ uint8_t getFingerprintEnroll(int id) {
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Image too messy");
       return p;
     case FINGERPRINT_PACKETRECIEVEERR:
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Communication error");
       return p;
     case FINGERPRINT_FEATUREFAIL:
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Could not find fingerprint features");
       return p;
     case FINGERPRINT_INVALIDIMAGE:
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Could not find fingerprint features");
       return p;
     default:
       clear_all();
       lights_red_on();
       lightsMillis = millis();
-      musicPlayer.playFullFile("rejected.mp3")
+      musicPlayer.playFullFile("rejected.mp3");
       Serial.println("Unknown error");
       return p;
   }
@@ -587,21 +584,21 @@ uint8_t getFingerprintEnroll(int id) {
     clear_all();
     lights_red_on();
     lightsMillis = millis();
-    musicPlayer.playFullFile("rejected.mp3")
+    musicPlayer.playFullFile("rejected.mp3");
     Serial.println("Communication error");
     return p;
   } else if (p == FINGERPRINT_ENROLLMISMATCH) {
     clear_all();
     lights_red_on();
     lightsMillis = millis();
-    musicPlayer.playFullFile("rejected.mp3")
+    musicPlayer.playFullFile("rejected.mp3");
     Serial.println("Fingerprints did not match");
     return p;
   } else {
     clear_all();
     lights_red_on();
     lightsMillis = millis();
-    musicPlayer.playFullFile("rejected.mp3")
+    musicPlayer.playFullFile("rejected.mp3");
     Serial.println("Unknown error");
     return p;
   }   
@@ -615,28 +612,28 @@ uint8_t getFingerprintEnroll(int id) {
     clear_all();
     lights_red_on();
     lightsMillis = millis();
-    musicPlayer.playFullFile("rejected.mp3")
+    musicPlayer.playFullFile("rejected.mp3");
     Serial.println("Communication error");
     return p;
   } else if (p == FINGERPRINT_BADLOCATION) {
     clear_all();
     lights_red_on();
     lightsMillis = millis();
-    musicPlayer.playFullFile("rejected.mp3")
+    musicPlayer.playFullFile("rejected.mp3");
     Serial.println("Could not store in that location");
     return p;
   } else if (p == FINGERPRINT_FLASHERR) {
     clear_all();
     lights_red_on();
     lightsMillis = millis();
-    musicPlayer.playFullFile("rejected.mp3")
+    musicPlayer.playFullFile("rejected.mp3");
     Serial.println("Error writing to flash");
     return p;
   } else {
     clear_all();
     lights_red_on();
     lightsMillis = millis();
-    musicPlayer.playFullFile("rejected.mp3")
+    musicPlayer.playFullFile("rejected.mp3");
     Serial.println("Unknown error");
     return p;
   }   
