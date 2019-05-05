@@ -122,9 +122,7 @@ bool noInputDome = true;
 // DREQ should be an Int pin, see http://arduino.cc/en/Reference/attachInterrupt
 #define DREQ 3       // VS1053 Data request, ideally an Interrupt pin
 
-Adafruit_VS1053_FilePlayer definedSoundsPlayer = Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, CARDCS);
-Adafruit_VS1053_FilePlayer msgPlayer = Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, WIFICARD);
-
+Adafruit_VS1053_FilePlayer musicPlayer = Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, CARDCS);
 
 // ---------------------------------------------------------------------------------------
 //    Dome Lights Setup
@@ -185,15 +183,13 @@ void setup()
     Serial.print(F("\r\nBluetooth Library Started"));
 
     // Setup for MP3 Player
-    if (! definedSoundsPlayer.begin()) { // initialise the music player
+    if (! musicPlayer.begin()) { // initialise the music player
         Serial.println(F("Couldn't find VS1053, do you have the right pins defined?"));
         while (1);
     }
     Serial.println(F("VS1053 found"));
-    definedSoundsPlayer.setVolume(20,20);
-    definedSoundsPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
-    msgPlayer.setVolume(20,20);
-    msgPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
+    musicPlayer.setVolume(20,20);
+    musicPlayer.useInterrupt(VS1053_FILEPLAYER_PIN_INT);
 
     // Setup legs motor
     Serial1.begin(9600);
@@ -219,7 +215,7 @@ void setup()
 
     /* Init SD Card */
     
-    if (!SD.begin(WIFICARD)) {
+    if (!SD.begin(CARDCS)) {
       Serial.println("SD initialization failed!");
       while(1);
     }
@@ -264,7 +260,7 @@ void setup()
     PS3Controller->attachOnInit(onInitPS3Controller); // onInitPS3Controller is called upon a new connection
 
 
-    definedSoundsPlayer.startPlayingFile("welcome.wav");
+    musicPlayer.startPlayingFile("welcome.mp3");
 
 }
 
@@ -323,7 +319,7 @@ void respondToInput() {
             clear_all();
             lights_red_on();
             lightsMillis = millis();
-            definedSoundsPlayer.startPlayingFile("denied.wav");
+            musicPlayer.startPlayingFile("denied.mp3");
           }
           else {
             Serial.print("Finger Accecpted with ");
@@ -424,7 +420,7 @@ void playMessage(int fingerId) {
   myFile.close();
   const char * msg = doc["fields"]["msgURL"]["stringValue"];
   if (msg == nullptr) {
-    definedSoundsPlayer.startPlayingFile("nomsg.wav");
+    musicPlayer.startPlayingFile("nomsg.mp3");
     return;
   }
   if (client.connect(storageServer, 443)) {
@@ -444,7 +440,7 @@ void playMessage(int fingerId) {
   if (SD.exists("msg.mp3")) {
     SD.remove("msg.mp3");
   }
-  definedSoundsPlayer.startPlayingFile("dialup.wav");
+  musicPlayer.startPlayingFile("dialup.mp3");
   myFile = SD.open("msg.mp3", FILE_WRITE);
   while(client.connected()) {
     if(myFile) {
@@ -460,9 +456,11 @@ void playMessage(int fingerId) {
   }
 
   if (myFile) {
+    Serial.println("myFile was opened");
+    musicPlayer.stopPlaying();
     myFile.close();
-    definedSoundsPlayer.stopPlaying();
-    msgPlayer.startPlayingFile("msg.mp3");
+    delay(3000);
+    musicPlayer.startPlayingFile("msg.mp3");
   }
 
   client.stop(); 
